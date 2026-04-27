@@ -147,7 +147,7 @@ class EmailExtractionPipeline:
         logger.info("PARSE STATISTICS")
         logger.info("=" * 60)
         logger.info(f"Total files found: {stats['total_files']}")
-        logger.info(f"Successfully parsed: {stats['successfully_parsed']}")
+        logger.info(f"Successfully parsed: {stats['successful_parses']}")
         logger.info(f"Failed to parse: {stats['failed_parses']}")
         logger.info(f"Success rate: {stats['success_rate']:.2f}%")
 

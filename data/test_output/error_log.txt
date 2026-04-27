@@ -1,0 +1,4 @@
+Date parsing error: Mon, 15 Jan 2001 09:30:00 -0600 - module 'dateutil.parser' has no attribute 'tz'
+Date parsing error: Mon, 15 Jan 2001 10:15:00 -0600 - module 'dateutil.parser' has no attribute 'tz'
+Date parsing error: Tue, 16 Jan 2001 14:00:00 -0600 - module 'dateutil.parser' has no attribute 'tz'
+Date parsing error: Wed, 17 Jan 2001 08:00:00 -0600 - module 'dateutil.parser' has no attribute 'tz'
