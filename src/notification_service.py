@@ -108,23 +108,23 @@ class NotificationService:
             Status dictionary
         """
         try:
-            # Get original email
+            # duplicate_of stores the original email's message_id (TEXT)
             original_msg_id = duplicate['duplicate_of']
             if not original_msg_id:
                 return {
-                    'duplicate_message_id': duplicate['message_id'],
+                    'timestamp': datetime.now().isoformat(),
                     'recipient': duplicate['from_address'],
+                    'subject': duplicate.get('subject', ''),
                     'status': 'failed',
                     'error': 'No original message ID found',
                 }
 
-            # For now, get original by querying the database
-            # In a real scenario, we'd look up the original record
-            original = self.db.get_email(duplicate['duplicate_of'])
+            original = self.db.get_email(original_msg_id)
             if not original:
                 return {
-                    'duplicate_message_id': duplicate['message_id'],
+                    'timestamp': datetime.now().isoformat(),
                     'recipient': duplicate['from_address'],
+                    'subject': duplicate.get('subject', ''),
                     'status': 'failed',
                     'error': 'Could not retrieve original email',
                 }
@@ -142,8 +142,9 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Error processing duplicate {duplicate['message_id']}: {str(e)}")
             return {
-                'duplicate_message_id': duplicate['message_id'],
-                'recipient': duplicate['from_address'],
+                'timestamp': datetime.now().isoformat(),
+                'recipient': duplicate.get('from_address', ''),
+                'subject': duplicate.get('subject', ''),
                 'status': 'failed',
                 'error': str(e),
             }
@@ -166,8 +167,8 @@ class NotificationService:
         import re
         display_subject = re.sub(r'^(re|fwd):\s*', '', original_subject, flags=re.IGNORECASE).strip()
 
-        # Calculate similarity score (placeholder, would be from duplicate detector)
-        similarity_score = 0.95  # Default
+        # Use actual similarity score stored in the database (defaults to 1.0 if missing)
+        similarity_score = duplicate.get('similarity_score') or 1.0
 
         body = f"""To: {recipient}
 Subject: [Duplicate Notice] Re: {display_subject}
@@ -235,18 +236,20 @@ Enron Email Deduplication System
 
             logger.info(f"Sending notification to {email_content['to']} via MCP")
 
-            # Record in database
+            # Record in database and update email notification status
             self.db.record_notification_sent(
                 email_content['duplicate_msg_id'],
                 email_content['to'],
                 'sent'
             )
+            self.db.update_notification_sent(email_content['duplicate_msg_id'])
 
             return {
-                'duplicate_message_id': email_content['duplicate_msg_id'],
-                'recipient': email_content['to'],
-                'status': 'sent',
                 'timestamp': datetime.now().isoformat(),
+                'recipient': email_content['to'],
+                'subject': email_content['subject'],
+                'status': 'sent',
+                'error': '',
             }
 
         except Exception as e:
@@ -259,11 +262,11 @@ Enron Email Deduplication System
             )
 
             return {
-                'duplicate_message_id': email_content['duplicate_msg_id'],
+                'timestamp': datetime.now().isoformat(),
                 'recipient': email_content['to'],
+                'subject': email_content.get('subject', ''),
                 'status': 'failed',
                 'error': str(e),
-                'timestamp': datetime.now().isoformat(),
             }
 
     def _generate_draft_file(self, email_content: Dict, duplicate: Dict, original: Dict, output_dir: str) -> Dict:
@@ -287,27 +290,36 @@ Enron Email Deduplication System
         filename = os.path.join(replies_dir, f"{safe_msg_id}.eml")
 
         try:
-            with open(filename, 'w') as f:
+            with open(filename, 'w', encoding='utf-8') as f:
                 f.write(email_content['body'])
 
             logger.info(f"Generated draft email: {filename}")
 
+            # Record draft as pending in notification log
+            self.db.record_notification_sent(
+                email_content['duplicate_msg_id'],
+                email_content['to'],
+                'pending'
+            )
+
             return {
-                'duplicate_message_id': email_content['duplicate_msg_id'],
-                'recipient': email_content['to'],
-                'status': 'drafted',
-                'file': filename,
                 'timestamp': datetime.now().isoformat(),
+                'recipient': email_content['to'],
+                'subject': email_content['subject'],
+                'status': 'drafted',
+                'error': '',
+                'draft_file': filename,
             }
 
         except Exception as e:
             logger.error(f"Error generating draft: {str(e)}")
             return {
-                'duplicate_message_id': email_content['duplicate_msg_id'],
+                'timestamp': datetime.now().isoformat(),
                 'recipient': email_content['to'],
+                'subject': email_content.get('subject', ''),
                 'status': 'failed',
                 'error': str(e),
-                'timestamp': datetime.now().isoformat(),
+                'draft_file': '',
             }
 
     def save_send_log(self, output_dir: str = 'data/output') -> str:

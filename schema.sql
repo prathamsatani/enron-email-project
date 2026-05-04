@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS emails (
     x_folder TEXT,
     x_origin TEXT,
     is_duplicate BOOLEAN DEFAULT FALSE,
-    duplicate_of INTEGER REFERENCES emails(id),
+    duplicate_of TEXT REFERENCES emails(message_id),
+    similarity_score REAL,
+    notification_sent BOOLEAN DEFAULT FALSE,
+    notification_date DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -32,7 +35,7 @@ CREATE TABLE IF NOT EXISTS recipients (
     UNIQUE(message_id, email_address, recipient_type)
 );
 
--- Duplicate detection metadata
+-- Notification send log
 CREATE TABLE IF NOT EXISTS notification_sent (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     duplicate_message_id TEXT NOT NULL,
@@ -50,6 +53,7 @@ CREATE INDEX IF NOT EXISTS idx_email_subject ON emails(subject);
 CREATE INDEX IF NOT EXISTS idx_email_message_id ON emails(message_id);
 CREATE INDEX IF NOT EXISTS idx_email_is_duplicate ON emails(is_duplicate);
 CREATE INDEX IF NOT EXISTS idx_email_duplicate_of ON emails(duplicate_of);
+CREATE INDEX IF NOT EXISTS idx_email_notification_sent ON emails(notification_sent);
 
 CREATE INDEX IF NOT EXISTS idx_recipients_message_id ON recipients(message_id);
 CREATE INDEX IF NOT EXISTS idx_recipients_email ON recipients(email_address);

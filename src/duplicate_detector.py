@@ -131,24 +131,17 @@ class DuplicateDetector:
 
     def _normalize_subject(self, subject: str) -> str:
         """
-        Normalize subject line (remove Re:/Fwd: prefixes).
-
-        Args:
-            subject: Original subject line
-
-        Returns:
-            Normalized subject
+        Normalize subject line by stripping all Re:/Fwd:/Fw: prefixes iteratively.
         """
         if not subject:
             return ''
-
-        # Remove Re: and Fwd: prefixes (case-insensitive)
-        normalized = re.sub(r'^(re|fwd):\s*', '', subject, flags=re.IGNORECASE).strip()
-
-        # Remove multiple consecutive spaces
-        normalized = re.sub(r'\s+', ' ', normalized)
-
-        return normalized
+        normalized = subject.strip()
+        while True:
+            stripped = re.sub(r'^(re|fwd|fw)\s*:\s*', '', normalized, flags=re.IGNORECASE).strip()
+            if stripped == normalized:
+                break
+            normalized = stripped
+        return re.sub(r'\s+', ' ', normalized)
 
     def _calculate_similarity(self, text1: str, text2: str) -> float:
         """
@@ -234,21 +227,29 @@ class DuplicateDetector:
                 groups[group_id] = {'original': orig_msg_id, 'duplicates': []}
                 msg_to_group[orig_msg_id] = group_id
 
-            # Add duplicate to group
-            groups[group_id]['duplicates'].append(dup_msg_id)
+            # Add duplicate to group with similarity score
+            groups[group_id]['duplicates'].append({
+                'msg_id': dup_msg_id,
+                'similarity_score': dup['similarity_score'],
+            })
             msg_to_group[dup_msg_id] = group_id
 
         # Flag all duplicates in database
         for group_id, group_info in groups.items():
             original_msg_id = group_info['original']
 
-            for dup_msg_id in group_info['duplicates']:
-                self.db.flag_as_duplicate(dup_msg_id, original_msg_id)
+            for dup_entry in group_info['duplicates']:
+                self.db.flag_as_duplicate(
+                    dup_entry['msg_id'],
+                    original_msg_id,
+                    dup_entry['similarity_score']
+                )
 
         # Update statistics
         self.statistics['total_groups'] = len(groups)
         self.statistics['total_flagged'] = len(duplicate_info)
         self.statistics['group_sizes'] = [len(g['duplicates']) + 1 for g in groups.values()]
+        self.duplicate_groups = groups
 
         logger.info(f"Duplicate detection complete: {len(groups)} groups, "
                    f"{len(duplicate_info)} emails flagged")

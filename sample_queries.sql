@@ -62,7 +62,7 @@ SELECT
     orig.date as original_date,
     (julianday(e.date) - julianday(orig.date)) as days_apart
 FROM emails e
-LEFT JOIN emails orig ON e.duplicate_of = orig.id
+LEFT JOIN emails orig ON e.duplicate_of = orig.message_id
 WHERE e.is_duplicate = TRUE
 ORDER BY e.date DESC
 LIMIT 25;

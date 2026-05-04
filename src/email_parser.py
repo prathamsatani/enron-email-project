@@ -10,6 +10,7 @@ import email
 from email import policy
 from email.parser import BytesParser
 from datetime import datetime
+from datetime import timezone as stdlib_timezone
 from dateutil import parser as date_parser
 from dateutil import tz as dateutil_tz
 import re
@@ -138,7 +139,9 @@ class EmailParser:
             dt = date_parser.parse(date_str, fuzzy=False)
 
             # Convert to UTC and format as ISO string
-            dt_utc = dt.astimezone(dateutil_tz.UTC)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=dateutil_tz.tzutc())
+            dt_utc = dt.astimezone(stdlib_timezone.utc)
             return dt_utc.isoformat()
         except Exception as e:
             # Log error but don't fail parsing

@@ -155,14 +155,16 @@ class EmailExtractionPipeline:
         for field, rate in sorted(stats['field_completeness'].items()):
             logger.info(f"  {field}: {rate:.2f}%")
 
-        # Save error log
+        # Always write error log (empty if no failures)
         errors = self.parser.get_errors()
-        if errors:
-            logger.info(f"\nSaving {len(errors)} parse errors to {self.error_log_path}")
-            os.makedirs(os.path.dirname(self.error_log_path) or '.', exist_ok=True)
-            with open(self.error_log_path, 'w') as f:
+        os.makedirs(os.path.dirname(self.error_log_path) or '.', exist_ok=True)
+        with open(self.error_log_path, 'w') as f:
+            if errors:
                 for error in errors:
                     f.write(error + '\n')
+            else:
+                f.write("# No parse errors\n")
+        logger.info(f"Error log saved to {self.error_log_path} ({len(errors)} errors)")
 
         self.statistics['parse_statistics'] = stats
 
