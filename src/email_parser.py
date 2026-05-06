@@ -63,7 +63,17 @@ class EmailParser:
         self.stats['total_files'] += 1
 
         try:
-            with open(file_path, 'rb') as f:
+            # Windows normalizes away trailing periods in file paths; use \\?\ prefix
+            # to bypass that, but we must NOT call abspath() on the full path because
+            # abspath also strips trailing dots.  Instead, normalize the parent dir
+            # (safe, no trailing dot there) and re-append the filename manually.
+            open_path = file_path
+            if sys.platform == 'win32' and os.path.basename(file_path).endswith('.'):
+                parent = os.path.abspath(os.path.dirname(file_path))
+                filename = os.path.basename(file_path)
+                open_path = '\\\\?\\' + parent + '\\' + filename
+
+            with open(open_path, 'rb') as f:
                 content = f.read()
 
             # Parse email using BytesParser for better encoding handling

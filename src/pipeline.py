@@ -4,10 +4,8 @@ Orchestrates the entire email extraction and processing pipeline.
 """
 
 import os
-import sys
 import logging
-from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from src.email_parser import EmailParser
 from src.database import EmailDatabase
@@ -124,7 +122,9 @@ class EmailExtractionPipeline:
 
     def _discover_email_files(self) -> List[str]:
         """
-        Recursively discover all .eml email files in maildir.
+        Recursively discover all email files in maildir.
+        Enron emails are named as plain numbers with a trailing period (e.g. "1.")
+        which is a Unix-style filename incompatible with Windows Explorer.
 
         Returns:
             List of email file paths
@@ -133,7 +133,7 @@ class EmailExtractionPipeline:
 
         for root, dirs, files in os.walk(self.maildir_path):
             for file in files:
-                if file.isdigit():  # Enron emails are named with numbers
+                if file.rstrip(".").isdigit():  # handles "1", "1.", "42.", etc.
                     filepath = os.path.join(root, file)
                     email_files.append(filepath)
 

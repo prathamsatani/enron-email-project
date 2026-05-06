@@ -5,9 +5,10 @@ Uses fuzzy matching to find emails with 90%+ body content similarity.
 """
 
 import re
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List
 from difflib import SequenceMatcher
 import logging
+from src.database import EmailDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class DuplicateDetector:
 
     SIMILARITY_THRESHOLD = 0.90  # 90% similarity threshold
 
-    def __init__(self, database):
+    def __init__(self, database: EmailDatabase):
         """
         Initialize detector with database connection.
 
