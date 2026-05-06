@@ -45,12 +45,13 @@ class EmailExtractionPipeline:
 
         self.statistics = {}
 
-    def run(self, send_live: bool = False) -> Dict:
+    def run(self, send_live: bool = False, limit: int = 50000) -> Dict:
         """
         Execute full pipeline.
 
         Args:
             send_live: If True, send emails. If False, generate drafts.
+            limit: Maximum number of emails to process.
 
         Returns:
             Summary statistics
@@ -66,7 +67,7 @@ class EmailExtractionPipeline:
 
             # Step 2: Discover and parse emails
             logger.info("Step 2: Discovering and parsing emails...")
-            self._extract_and_store_emails()
+            self._extract_and_store_emails(limit=50000)
 
             # Step 3: Log parse statistics
             logger.info("Step 3: Analyzing parse statistics...")
@@ -94,9 +95,9 @@ class EmailExtractionPipeline:
             logger.error(f"Pipeline failed: {str(e)}", exc_info=True)
             raise
 
-    def _extract_and_store_emails(self) -> None:
+    def _extract_and_store_emails(self, limit=50000) -> None:
         """Discover and parse all email files, store in database."""
-        email_files = self._discover_email_files()
+        email_files = self._discover_email_files(limit=limit)
         logger.info(f"Found {len(email_files)} email files")
 
         stored_count = 0
@@ -120,7 +121,7 @@ class EmailExtractionPipeline:
             'stored_in_db': stored_count,
         }
 
-    def _discover_email_files(self) -> List[str]:
+    def _discover_email_files(self, limit=50000) -> List[str]:
         """
         Recursively discover all email files in maildir.
         Enron emails are named as plain numbers with a trailing period (e.g. "1.")
@@ -130,12 +131,16 @@ class EmailExtractionPipeline:
             List of email file paths
         """
         email_files = []
-
+        processed = 0
         for root, dirs, files in os.walk(self.maildir_path):
             for file in files:
                 if file.rstrip(".").isdigit():  # handles "1", "1.", "42.", etc.
                     filepath = os.path.join(root, file)
                     email_files.append(filepath)
+                    processed += 1
+                    if processed >= limit:
+                        logger.info(f"File discovery limit reached: {limit} files")
+                        return sorted(email_files)
 
         return sorted(email_files)
 

@@ -1,28 +1,11 @@
 {
-    "mcp_servers": {
-        "gmail": {
-            "enabled": true,
-            "type": "gmail",
-            "server_url": "http://localhost:3000",
-            "description": "Gmail MCP server for sending duplicate notification emails",
-            "gmail_account": "your-gmail@gmail.com",
-            "authentication": {
-                "type": "oauth2",
-                "credentials_file": "/path/to/credentials.json"
-            }
-        }
+    "enabled": false,
+    "gmail_account": "your-gmail@gmail.com",
+    "authentication": {
+        "type": "oauth2",
+        "credentials_file": "credentials.json"
     },
-    "settings": {
-        "notification_enabled": false,
-        "dry_run": true,
-        "max_retries": 3
-    },
-    "description": "MCP Configuration Example for Gmail Integration",
-    "instructions": [
-        "1. Replace 'your-gmail@gmail.com' with your actual Gmail address",
-        "2. Set up Gmail OAuth2 credentials and save to credentials.json",
-        "3. Set 'enabled': true when ready to send live emails",
-        "4. Keep 'dry_run': true initially to test draft generation",
-        "5. Update credentials_file path to point to your credentials.json location"
-    ]
+    "token_file": "gmail_token.json",
+    "dry_run": true,
+    "max_retries": 3
 }

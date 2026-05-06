@@ -4,13 +4,14 @@ Handles email notifications via MCP Gmail server integration.
 Sends duplicate notification emails to senders of flagged duplicates.
 """
 
+import base64
 import os
 import json
 import csv
 import logging
+from email.mime.text import MIMEText
 from typing import Dict, List, Optional
 from datetime import datetime
-import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,15 @@ class NotificationService:
 
         try:
             with open(config_path, 'r') as f:
-                return json.load(f)
+                raw = json.load(f)
+
+            # Support both flat structure {"enabled": true, ...}
+            # and legacy nested structure {"mcp_servers": {"gmail": {"enabled": true, ...}}}
+            if 'mcp_servers' in raw:
+                cfg = raw.get('mcp_servers', {}).get('gmail', {})
+                cfg.setdefault('dry_run', raw.get('settings', {}).get('dry_run', True))
+                return cfg
+            return raw
         except Exception as e:
             logger.error(f"Error loading MCP config: {str(e)}")
             return {'enabled': False}
@@ -207,40 +216,81 @@ Enron Email Deduplication System
             'original_msg_id': original['message_id'],
         }
 
+    def _get_gmail_service(self):
+        """Return an authenticated Gmail API service, refreshing tokens as needed."""
+        try:
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+            from google_auth_oauthlib.flow import InstalledAppFlow
+            from googleapiclient.discovery import build
+        except ImportError as exc:
+            raise RuntimeError(
+                "Gmail API packages not installed. "
+                "Run: pip install google-auth-oauthlib google-api-python-client"
+            ) from exc
+
+        scopes = ["https://www.googleapis.com/auth/gmail.send"]
+        token_path = (
+            self.mcp_config.get('token_file')
+            or os.getenv('GMAIL_TOKEN_FILE', 'gmail_token.json')
+        )
+        creds_path = (
+            self.mcp_config.get('authentication', {}).get('credentials_file')
+            or os.getenv('GMAIL_CREDENTIALS_FILE', 'credentials.json')
+        )
+
+        creds = None
+        if os.path.exists(token_path):
+            creds = Credentials.from_authorized_user_file(token_path, scopes)
+
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                if not os.path.exists(creds_path):
+                    raise FileNotFoundError(
+                        f"Gmail credentials file not found: {creds_path}. "
+                        "Run setup_gmail_oauth.py first."
+                    )
+                flow = InstalledAppFlow.from_client_secrets_file(creds_path, scopes)
+                creds = flow.run_local_server(port=0)
+            with open(token_path, 'w') as fh:
+                fh.write(creds.to_json())
+
+        return build('gmail', 'v1', credentials=creds)
+
     def _send_via_mcp(self, email_content: Dict, duplicate: Dict, original: Dict) -> Dict:
-        """
-        Send email via MCP Gmail server.
-
-        Args:
-            email_content: Composed email content
-            duplicate: Duplicate record
-            original: Original record
-
-        Returns:
-            Status dictionary
-        """
+        """Send notification email via Gmail API."""
         if not self.mcp_config.get('enabled'):
-            logger.warning("MCP is not enabled in configuration")
+            logger.warning("Gmail sending not enabled in mcp_config.json")
             return {
-                'duplicate_message_id': email_content['duplicate_msg_id'],
-                'recipient': email_content['to'],
-                'status': 'failed',
-                'error': 'MCP not enabled',
                 'timestamp': datetime.now().isoformat(),
+                'recipient': email_content['to'],
+                'subject': email_content.get('subject', ''),
+                'status': 'failed',
+                'error': 'MCP not enabled in config',
             }
 
         try:
-            # Construct MCP call
-            # This would typically use a subprocess or HTTP call to the MCP server
-            # For now, we'll log the action
+            service = self._get_gmail_service()
 
-            logger.info(f"Sending notification to {email_content['to']} via MCP")
+            msg = MIMEText(email_content['body'])
+            msg['to'] = email_content['to']
+            msg['subject'] = email_content['subject']
+            raw = base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
 
-            # Record in database and update email notification status
+            result = service.users().messages().send(
+                userId='me', body={'raw': raw}
+            ).execute()
+
+            logger.info(
+                f"Sent notification to {email_content['to']}, Gmail ID: {result['id']}"
+            )
+
             self.db.record_notification_sent(
                 email_content['duplicate_msg_id'],
                 email_content['to'],
-                'sent'
+                'sent',
             )
             self.db.update_notification_sent(email_content['duplicate_msg_id'])
 
@@ -253,14 +303,13 @@ Enron Email Deduplication System
             }
 
         except Exception as e:
-            logger.error(f"Error sending via MCP: {str(e)}")
+            logger.error(f"Error sending via Gmail API: {str(e)}")
             self.db.record_notification_sent(
                 email_content['duplicate_msg_id'],
                 email_content['to'],
                 'failed',
-                str(e)
+                str(e),
             )
-
             return {
                 'timestamp': datetime.now().isoformat(),
                 'recipient': email_content['to'],

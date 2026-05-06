@@ -1,2 +1,10 @@
 python-dateutil==2.8.2
 email-validator==2.2.0
+
+# Gmail API (required for --send-live and the Gmail MCP server)
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.100.0
+
+# MCP server (required for src/gmail_mcp_server.py used by Claude Code)
+mcp>=1.0.0

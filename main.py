@@ -46,6 +46,14 @@ Examples:
         required=True,
         help='Path to Enron maildir root directory'
     )
+    
+    parser.add_argument(
+        '--limit',
+        type=int,
+        default=50000,
+        help='Maximum number of emails to process (default: 50000)'
+    )
+
 
     parser.add_argument(
         '--db-path',
@@ -89,7 +97,7 @@ def main() -> int:
         )
 
         # Execute pipeline
-        statistics = pipeline.run(send_live=args.send_live)
+        statistics = pipeline.run(send_live=args.send_live, limit=50000)
         pipeline.print_summary()
 
         logger.info("Pipeline execution completed successfully!")
