@@ -15,6 +15,10 @@
   - Mandatory field extraction (message_id, date, from, to, subject, body, source_file)
   - Optional field extraction (cc, bcc, x_*, content_type, attachments, etc.)
   - Edge case handling: malformed headers, encoding issues, multipart messages
+  - **Windows trailing-period fix**: Enron files are named `1.`, `21.`, etc.; Windows
+    silently drops trailing dots from paths, making them unreachable.  The parser
+    detects this at runtime and re-opens via the `\\?\` extended-path prefix,
+    normalizing only the parent directory (not the full path) to preserve the dot.
   - Statistics tracking: parse success rate, field completeness
   
 - **database.py** (12KB): SQLite storage and retrieval layer
@@ -114,9 +118,11 @@
 - **Dependencies**: 2 packages (dateutil, email-validator) + standard library
 
 ### Testing Results
-- **Test Run**: 4 synthetic emails processed successfully
-- **Parsing Success Rate**: 100% (4/4 emails)
-- **Storage Success Rate**: 100% (4/4 stored in database)
+
+- **Synthetic test run**: 4 emails processed, 0 errors — validates schema and pipeline flow
+- **Real data test run** (`arora-h` mailbox, 654 emails): 654/654 parsed, 0 errors,
+  87 duplicate groups detected, 207 emails flagged
+- **Parsing Success Rate**: 100% on both test sets
 - **Database Operations**: All CRUD operations verified
 - **Pipeline Reproducibility**: Confirmed (deterministic results)
 

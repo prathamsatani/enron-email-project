@@ -1,7 +1,7 @@
 # AI Tool Usage Documentation - Enron Email Pipeline
 
-**Tool Used**: Claude Code (Claude Haiku 4.5)  
-**Date**: April 27, 2026  
+**Tool Used**: Claude Code (Claude Sonnet 4.6)  
+**Date**: May 6, 2026 (last updated)  
 **Assignment**: Data Extraction & Structuring - Enron Email Dataset
 
 ---
@@ -220,6 +220,39 @@ Implement storage, retrieval, and duplicate flagging methods."
 **Refinement Prompt**: "For groups with >2 similar emails, ensure all except the earliest are flagged as duplicates."
 **Solution**: Rewrote duplicate flagging to build clusters, not just pairs
 
+### Example 4: Windows Trailing-Period Filenames
+
+**Observed Error** (from `error_log.txt` on the real Enron dataset):
+
+```text
+Failed to parse ./data/data/enron_mail\arora-h\all_documents\21.:
+  [Errno 2] No such file or directory: './data/data/enron_mail\arora-h\all_documents\21.'
+```
+
+**Root Cause**: The Enron archive was created on Linux where filenames ending with
+`.` are valid (e.g. `1.`, `21.`).  On Windows, the Win32 API silently normalizes
+trailing periods away, so `open("path/21.", "rb")` actually requests `path/21`,
+which does not exist.
+
+**First Fix Attempt**: Prepend the `\\?\` extended-path prefix to bypass Windows
+normalization — but used `os.path.abspath()` to build the full path first.  This
+also stripped the trailing period, so the fix had no effect.
+
+**Refinement Prompt**: "The \\?\\ prefix still fails because abspath() strips the
+trailing dot before we can prepend it.  Normalize only the parent directory with
+abspath(), then manually re-append the filename so the dot is preserved."
+
+**Final Solution** (`email_parser.py`):
+
+```python
+if sys.platform == 'win32' and os.path.basename(file_path).endswith('.'):
+    parent = os.path.abspath(os.path.dirname(file_path))  # safe — no trailing dot
+    filename = os.path.basename(file_path)                # preserves trailing dot
+    open_path = '\\\\?\\' + parent + '\\' + filename
+```
+
+**Verified**: `arora-h` mailbox — 654/654 emails parsed, 0 errors.
+
 ## Code Breakdown: AI-Generated vs. Manual
 
 Approximate breakdown of the codebase:
@@ -260,10 +293,14 @@ Manual refinements included:
 ### What Required Manual Refinement
 
 1. **Edge Cases**: Required domain knowledge of Enron email format quirks
-2. **Performance Tuning**: Manual optimization of duplicate detection grouping
-3. **MCP Integration**: Required understanding of external service protocols
-4. **Testing Edge Cases**: Needed to anticipate specific failure modes
-5. **Business Logic**: Duplicate definition (90% threshold) needed discussion/refinement
+2. **OS-Specific Filesystem Bugs**: Windows trailing-period issue required two
+   debugging iterations — the initial `\\?\` fix was insufficient because
+   `os.path.abspath()` itself normalizes away the dot; the correct fix separates
+   parent-dir normalization from filename appending (see Example 4 above)
+3. **Performance Tuning**: Manual optimization of duplicate detection grouping
+4. **MCP Integration**: Required understanding of external service protocols
+5. **Testing Edge Cases**: Needed to anticipate specific failure modes
+6. **Business Logic**: Duplicate definition (90% threshold) needed discussion/refinement
 
 ### Effective Prompting Techniques
 

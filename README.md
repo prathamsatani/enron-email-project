@@ -77,6 +77,11 @@ For this project, only 5-10 employee mailboxes (minimum 10,000 emails) are requi
    # or use a smaller subset for testing
    ```
 
+   > **Windows note**: The Enron archive contains email files named with a trailing
+   > period (e.g. `1.`, `21.`) — a valid Unix filename that Windows cannot open
+   > through its normal path API.  The pipeline handles this automatically using the
+   > `\\?\` extended-path prefix, so no manual renaming is needed.
+
 5. **Configure Gmail MCP** (for email sending)
    - Copy `mcp_config.json.example` to `mcp_config.json`
    - Update Gmail credentials and server URL
@@ -214,6 +219,7 @@ The pipeline is designed to be **resilient to malformed input**:
 - ✅ Logs all failures with specific reasons
 - ✅ Never crashes on individual email errors
 - ✅ Continues processing remaining emails
+- ✅ Opens files with trailing-period names on Windows (e.g. `21.`) via `\\?\` extended-path prefix
 
 All parse failures are logged to `error_log.txt` with:
 - File path
@@ -301,6 +307,19 @@ sqlite3.OperationalError: database is locked
 
 ### Gmail MCP Connection Failed
 **Solution**: Verify MCP server is running on correct port; check credentials in mcp_config.json.
+
+### All emails fail with "No such file or directory" on Windows
+
+```text
+Failed to parse ...\21.: [Errno 2] No such file or directory: '...\21.'
+```
+
+**Cause**: The Enron archive stores email files with trailing periods (e.g. `21.`).
+Windows silently strips trailing periods from paths in its normal file API, making
+the file unreachable.  
+**Solution**: Already handled — `email_parser.py` detects this condition at runtime
+and re-opens the file using the `\\?\` extended-path prefix, which bypasses Windows
+path normalization and reaches the file as-is.  No user action is required.
 
 ## Future Enhancements
 
