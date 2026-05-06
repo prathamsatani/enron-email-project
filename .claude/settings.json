@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "gmail": {
+      "command": ".venv\\Scripts\\python.exe",
+      "args": ["src/gmail_mcp_server.py"],
+      "env": {
+        "GMAIL_CREDENTIALS_FILE": "credentials.json",
+        "GMAIL_TOKEN_FILE": "gmail_token.json"
+      }
+    }
+  }
+}
